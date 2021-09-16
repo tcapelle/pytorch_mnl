@@ -127,7 +127,7 @@ class Learner:
             weight_decay=wd
         )
 
-        for epoch in progress_bar(range_of(n_epochs)):
+        for epoch in progress_bar(range_of(n_epochs), leave=False):
             loss = self.train_one_epoch()
             val_loss, accuracy = self.validate()
             print(f'epoch = {epoch:3.0f}, val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
