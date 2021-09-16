@@ -19,7 +19,6 @@ def prepare_data(data, x_cols=None, target_col=None):
     "This is far from optimal, as we shu=ould be reading values lazily"
     target_col = ifnone(target_col, list(data.columns)[-1])
     x_cols = [col for col in ifnone(x_cols, list(data.columns)) if col!=target_col]
-    print(f'{x_cols=},\n{target_col=}')
     X_numpy = data.loc[:, x_cols].values
     target_map = {
         val: index for index, val in enumerate(data.loc[:,target_col].unique())
