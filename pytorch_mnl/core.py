@@ -17,14 +17,15 @@ from fastprogress import progress_bar, master_bar
 from fastcore.all import *
 
 # Cell
-def prepare_data(data, x_cols=None, target_col=None, av_cols=None):
+def prepare_data(data, x_cols=None, target_col=None, av_cols=None, target_map=None):
     "This is far from optimal, as we shuould be reading values lazily"
     target_col = ifnone(target_col, list(data.columns)[-1])
     x_cols = [col for col in ifnone(x_cols, list(data.columns)) if col!=target_col]
     X_numpy = data.loc[:, x_cols].values
-    target_map = {
+    default_target_map = {
         val: index for index, val in enumerate(data.loc[:,target_col].unique())
     }
+    target_map = ifnone(target_map, default_target_map)
     print(target_map)
     y_numpy = data.loc[:,target_col].map(target_map).values
 
@@ -74,7 +75,8 @@ class DataLoaders:
     """
     A class to store dataloaders (train/valid/test....)"""
     def __init__(self, train_dl, valid_dl=None):
-        store_attr()
+        self.train_dl = train_dl
+        self.valid_dl = ifnone(valid_dl, train_dl)
 
     def one_batch(self, dl=None):
         dl = ifnone(dl, self.train_dl)
@@ -111,7 +113,7 @@ class EarlyStopping():
     Early stopping to stop the training when the loss does not improve after
     certain epochs.
     """
-    def __init__(self, patience=2, min_delta=0.001):
+    def __init__(self, patience=10, min_delta=1e-4):
         """
         :param patience: how many epochs to wait before stopping when loss is
                not improving
@@ -139,12 +141,12 @@ class EarlyStopping():
 # Cell
 class Learner:
     "A wrapper around dls, model and optimizer"
-    def __init__(self, dls, model, loss_func=torch.nn.CrossEntropyLoss()):
+    def __init__(self, dls, model, loss_func=torch.nn.CrossEntropyLoss(reduction='sum')):
         store_attr()
 
 
     def train_one_epoch(self):
-        accum_loss = 0.
+        train_loss = 0.
         for batch, (x, y, av) in enumerate(self.dls.train_dl):
             pred = self.model(x, av)  # 1
             loss = self.loss_func(pred, y)
@@ -153,20 +155,20 @@ class Learner:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            accum_loss += loss.item()
-        return accum_loss
+            train_loss += loss.item()
+        return train_loss
 
     def validate(self, dl=None):
         dl = ifnone(dl, self.dls.valid_dl)
-        if (dl is None):
-            dl = self.dls.train_dl
         val_loss, accu = 0, 0
+        preds = []
         with torch.no_grad():
             for batch, (x, y, av) in enumerate(dl):
                 pred = self.model(x, av)
                 val_loss += self.loss_func(pred, y).item()
                 accu += (pred.argmax(1) == y).type(torch.float).sum().item()
-        return val_loss, accu / len(dl.dataset)
+                preds += [pred]
+        return torch.cat(preds), val_loss, accu / len(dl.dataset)
 
     def fit(self, n_epochs=10, lr=0.01, wd=0.01):
 
@@ -176,15 +178,24 @@ class Learner:
             weight_decay=wd
         )
 
+        initial_loss = _, val_loss, accuracy = self.validate()
+        print(f'Starting fit model: \nInitial val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
+
         early_stopping = EarlyStopping()
 
-        scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=2, threshold=0.01, verbose=True)
+        scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=2, threshold=1e-4, verbose=True)
 
         for epoch in progress_bar(range_of(n_epochs), leave=False):
-            loss = self.train_one_epoch()
-            val_loss, accuracy = self.validate()
+            train_loss = self.train_one_epoch()
+            _, val_loss, accuracy = self.validate()
             scheduler.step(val_loss)
             early_stopping(val_loss)
             if early_stopping.early_stop:
                 break
-            print(f'epoch = {epoch:3.0f}, train_loss = {loss:.3f}, val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
+            print(f'epoch = {epoch:3.0f}, train_loss = {train_loss:.3f}, val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
+
+    def get_preds(self, dl=None, with_loss=False):
+        dl = ifnone(dl, self.dls.valid_dl)
+        preds, val_loss, accu = self.validate(dl)
+        _, targets, _ = dl.dataset.tensors
+        return (preds, targets, val_loss) if with_loss else (preds, targets)
