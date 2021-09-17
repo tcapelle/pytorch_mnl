@@ -4,8 +4,10 @@ __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
 index = {"prepare_data": "00_core.ipynb",
          "train_valid_split": "00_core.ipynb",
+         "Availability": "00_core.ipynb",
          "LinearMNL": "00_core.ipynb",
          "DataLoaders": "00_core.ipynb",
+         "EarlyStopping": "00_core.ipynb",
          "Learner": "00_core.ipynb"}
 
 modules = ["core.py"]
