@@ -61,7 +61,7 @@ class DataLoaders:
         store_attr()
 
     def one_batch(self, dl=None):
-        dl = ifnone(dl, self.dl_train)
+        dl = ifnone(dl, self.train_dl)
         return next(iter(dl))
 
     @delegates(DataLoader, but='batch_size')
@@ -97,6 +97,7 @@ class Learner:
 
 
     def train_one_epoch(self):
+        accum_loss = 0.
         for batch, (x, y) in enumerate(self.dls.train_dl):
             pred = self.model(x)  # 1
             loss = self.loss_func(pred, y)
@@ -105,7 +106,8 @@ class Learner:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-        return loss
+            accum_loss += loss.item()
+        return accum_loss
 
     def validate(self, dl=None):
         dl = ifnone(dl, self.dls.valid_dl)
@@ -130,4 +132,4 @@ class Learner:
         for epoch in progress_bar(range_of(n_epochs), leave=False):
             loss = self.train_one_epoch()
             val_loss, accuracy = self.validate()
-            print(f'epoch = {epoch:3.0f}, val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
+            print(f'epoch = {epoch:3.0f}, train_loss = {loss:.3f}, val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
