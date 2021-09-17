@@ -170,7 +170,7 @@ class Learner:
                 preds += [pred]
         return torch.cat(preds), val_loss, accu / len(dl.dataset)
 
-    def fit(self, n_epochs=10, lr=0.01, wd=0.01):
+    def fit(self, n_epochs=10, lr=0.01, wd=0.01, patience=10):
 
         self.optimizer = torch.optim.SGD(
             self.model.parameters(),
@@ -181,9 +181,9 @@ class Learner:
         initial_loss = _, val_loss, accuracy = self.validate()
         print(f'Starting fit model: \nInitial val_loss = {val_loss:.3f}, accuracy = {accuracy:.2f}')
 
-        early_stopping = EarlyStopping()
+        early_stopping = EarlyStopping(patience=patience)
 
-        scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=2, threshold=1e-4, verbose=True)
+        scheduler = ReduceLROnPlateau(self.optimizer, 'min', patience=patience, threshold=1e-4, verbose=True)
 
         for epoch in progress_bar(range_of(n_epochs), leave=False):
             train_loss = self.train_one_epoch()
