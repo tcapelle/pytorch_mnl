@@ -25,6 +25,7 @@ def prepare_data(data, x_cols=None, target_col=None, av_cols=None):
     target_map = {
         val: index for index, val in enumerate(data.loc[:,target_col].unique())
     }
+    print(target_map)
     y_numpy = data.loc[:,target_col].map(target_map).values
 
     X = torch.tensor(X_numpy, dtype=torch.float32)
@@ -110,7 +111,7 @@ class EarlyStopping():
     Early stopping to stop the training when the loss does not improve after
     certain epochs.
     """
-    def __init__(self, patience=2, min_delta=0):
+    def __init__(self, patience=2, min_delta=0.001):
         """
         :param patience: how many epochs to wait before stopping when loss is
                not improving
